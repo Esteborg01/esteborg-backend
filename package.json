@@ -1,19 +1,13 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-
-dotenv.config();
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-const PORT = process.env.PORT || 4000;
-
-app.get("/", (req, res) => {
-  res.send("Servidor Esteborg está vivo 🦾");
-});
-
-app.listen(PORT, () => {
-  console.log(`Esteborg backend escuchando en http://localhost:${PORT}`);
-});
+{
+  "name": "esteborg-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.19.2"
+  }
+}
