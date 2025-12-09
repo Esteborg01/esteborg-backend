@@ -5,9 +5,13 @@
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const app = express();
+
+// Clave para firmar el Tokken (ponla en variables de entorno en Render)
+const TOKEN_SECRET = process.env.TOKEN_SECRET || "CAMBIA_ESTA_CLAVE_EN_RENDER";
 
 // Middleware
 app.use(express.json());
@@ -22,12 +26,14 @@ app.use(
   })
 );
 
-// Ruta de prueba
+// ====== RUTAS BÁSICAS ======
+
+// Salud
 app.get("/", (req, res) => {
   res.send("Esteborg backend OK ✔");
 });
 
-// GET de prueba para /generate-token
+// Info de prueba de /generate-token
 app.get("/generate-token", (req, res) => {
   res.json({
     ok: true,
@@ -35,7 +41,8 @@ app.get("/generate-token", (req, res) => {
   });
 });
 
-// Ruta principal: POST /generate-token
+// ====== GENERAR TOKKEN (JWT) ======
+
 app.post("/generate-token", (req, res) => {
   try {
     const { email, personUid, accountUid } = req.body;
@@ -44,13 +51,19 @@ app.post("/generate-token", (req, res) => {
       return res.status(400).json({ error: "Falta email" });
     }
 
-    // Generar token aleatorio de 64 chars
-    const token = crypto.randomBytes(32).toString("hex");
+    // Payload del usuario
+    const payload = {
+      email,
+      personUid: personUid || null,
+      accountUid: accountUid || null,
+      nonce: crypto.randomBytes(8).toString("hex"),
+    };
 
-    console.log("Tokken generado para:", email, token, personUid, accountUid);
+    // Firmar Tokken (ej. 30 días)
+    const token = jwt.sign(payload, TOKEN_SECRET, { expiresIn: "30d" });
 
-    // Por ahora SOLO devolvemos el token.
-    // (Luego volvemos a conectar Outseta si quieres.)
+    console.log("Tokken generado para:", email);
+
     return res.json({ token });
   } catch (err) {
     console.error("Error en /generate-token:", err);
@@ -58,7 +71,39 @@ app.post("/generate-token", (req, res) => {
   }
 });
 
-// Levantar servidor
+// ====== VALIDAR TOKKEN ======
+
+app.post("/validate-token", (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res
+      .status(400)
+      .json({ valid: false, error: "No se recibió tokken" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, TOKEN_SECRET);
+
+    // Si todo está bien:
+    return res.json({
+      valid: true,
+      user: {
+        email: decoded.email,
+        personUid: decoded.personUid,
+        accountUid: decoded.accountUid,
+      },
+    });
+  } catch (err) {
+    console.error("Error validando tokken:", err.message);
+    return res
+      .status(401)
+      .json({ valid: false, error: "Tokken inválido o expirado" });
+  }
+});
+
+// ====== LEVANTAR SERVIDOR ======
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log("🔥 Servidor Esteborg escuchando en el puerto " + port);
