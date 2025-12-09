@@ -1,7 +1,3 @@
-// ==========================
-//     ESTEBORG BACKEND
-// ==========================
-
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -10,10 +6,8 @@ require("dotenv").config();
 
 const app = express();
 
-// Clave para firmar el Tokken (ponla en variables de entorno en Render)
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "CAMBIA_ESTA_CLAVE_EN_RENDER";
 
-// Middleware
 app.use(express.json());
 app.use(
   cors({
@@ -26,14 +20,12 @@ app.use(
   })
 );
 
-// ====== RUTAS BÁSICAS ======
-
 // Salud
 app.get("/", (req, res) => {
   res.send("Esteborg backend OK ✔");
 });
 
-// Info de prueba de /generate-token
+// Info de prueba
 app.get("/generate-token", (req, res) => {
   res.json({
     ok: true,
@@ -41,8 +33,7 @@ app.get("/generate-token", (req, res) => {
   });
 });
 
-// ====== GENERAR TOKKEN (JWT) ======
-
+// ========= GENERAR TOKKEN (POST) =========
 app.post("/generate-token", (req, res) => {
   try {
     const { email, personUid, accountUid } = req.body;
@@ -51,7 +42,6 @@ app.post("/generate-token", (req, res) => {
       return res.status(400).json({ error: "Falta email" });
     }
 
-    // Payload del usuario
     const payload = {
       email,
       personUid: personUid || null,
@@ -59,7 +49,7 @@ app.post("/generate-token", (req, res) => {
       nonce: crypto.randomBytes(8).toString("hex"),
     };
 
-    // Firmar Tokken (ej. 30 días)
+    // Tokken JWT válido 30 días
     const token = jwt.sign(payload, TOKEN_SECRET, { expiresIn: "30d" });
 
     console.log("Tokken generado para:", email);
@@ -71,10 +61,9 @@ app.post("/generate-token", (req, res) => {
   }
 });
 
-// ====== VALIDAR TOKKEN ======
-
-app.post("/validate-token", (req, res) => {
-  const { token } = req.body;
+// ========= VALIDAR TOKKEN (GET /validate?token=...) =========
+app.get("/validate", (req, res) => {
+  const token = req.query.token;
 
   if (!token) {
     return res
@@ -85,7 +74,6 @@ app.post("/validate-token", (req, res) => {
   try {
     const decoded = jwt.verify(token, TOKEN_SECRET);
 
-    // Si todo está bien:
     return res.json({
       valid: true,
       user: {
@@ -102,8 +90,36 @@ app.post("/validate-token", (req, res) => {
   }
 });
 
-// ====== LEVANTAR SERVIDOR ======
+// (opcional) también POST /validate-token, por si después lo usas
+app.post("/validate-token", (req, res) => {
+  const { token } = req.body;
 
+  if (!token) {
+    return res
+      .status(400)
+      .json({ valid: false, error: "No se recibió tokken" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, TOKEN_SECRET);
+
+    return res.json({
+      valid: true,
+      user: {
+        email: decoded.email,
+        personUid: decoded.personUid,
+        accountUid: decoded.accountUid,
+      },
+    });
+  } catch (err) {
+    console.error("Error validando tokken (POST):", err.message);
+    return res
+      .status(401)
+      .json({ valid: false, error: "Tokken inválido o expirado" });
+  }
+});
+
+// Levantar servidor
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log("🔥 Servidor Esteborg escuchando en el puerto " + port);
