@@ -1,88 +1,62 @@
 import express from "express";
 import cors from "cors";
 
-// ==============================
-// APP SETUP
-// ==============================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// ==============================
-// CORS CONFIG (CLAVE)
-// ==============================
-const allowedOrigins = [
-  "https://membersvip.esteborg.live",
-];
+// ✅ CORS
+const allowedOrigins = ["https://membersvip.esteborg.live"];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Permite requests sin origin (Render health checks, curl, etc.)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS: " + origin));
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS: " + origin));
     },
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: false, // pon true SOLO si usas cookies
+    credentials: false,
   })
 );
 
-// Preflight (OPTIONS) para todas las rutas
+// ✅ Preflight
 app.options("*", cors());
 
-// ==============================
-// HEALTH CHECK (Render lo ama)
-// ==============================
+// ✅ Health check
 app.get("/", (req, res) => {
-  res.send("Esteborg backend running 🚀");
+  res.status(200).send("Esteborg backend running 🚀");
 });
 
-// ==============================
-// TOKEN GENERATION ENDPOINT
-// ==============================
+// ✅ Token endpoint
 app.post("/generate-token", async (req, res) => {
   try {
-    const { user } = req.body;
+    const { email, personUid, accountUid } = req.body || {};
 
-    if (!user) {
-      return res.status(400).json({ error: "User data missing" });
+    if (!email || !personUid || !accountUid) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: email, personUid, accountUid",
+      });
     }
 
-    // 👉 AQUÍ VA TU LÓGICA REAL DE TOKEN
-    // Ejemplo simple:
+    // TODO: aquí va tu lógica REAL para generar token
+    // Por ahora regresamos uno de prueba para validar CORS:
     const token = Buffer.from(
-      JSON.stringify({
-        userId: user.id || "demo",
-        email: user.email || "demo@esteborg.live",
-        issuedAt: Date.now(),
-      })
+      JSON.stringify({ email, personUid, accountUid, ts: Date.now() })
     ).toString("base64");
 
-    return res.status(200).json({
-      success: true,
-      token,
-    });
-  } catch (error) {
-    console.error("Token generation error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Token generation failed",
-    });
+    return res.status(200).json({ success: true, token });
+  } catch (err) {
+    console.error("Token generation error:", err);
+    return res
+      .status(500)
+      .json({ success: false, error: "Token generation failed" });
   }
 });
 
-// ==============================
-// SERVER START
-// ==============================
 app.listen(PORT, () => {
   console.log(`🔥 Esteborg backend listening on port ${PORT}`);
-});
-
 });
