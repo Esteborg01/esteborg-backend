@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// ✅ CORS
+// ✅ CORS: permite SOLO tu dominio nuevo
 const allowedOrigins = ["https://membersvip.esteborg.live"];
 
 app.use(
@@ -22,7 +22,7 @@ app.use(
   })
 );
 
-// ✅ Preflight
+// ✅ Preflight (OPTIONS)
 app.options("*", cors());
 
 // ✅ Health check
@@ -30,7 +30,7 @@ app.get("/", (req, res) => {
   res.status(200).send("Esteborg backend running 🚀");
 });
 
-// ✅ Token endpoint
+// ✅ Token endpoint (recibe lo que tu front ya manda)
 app.post("/generate-token", async (req, res) => {
   try {
     const { email, personUid, accountUid } = req.body || {};
@@ -42,8 +42,7 @@ app.post("/generate-token", async (req, res) => {
       });
     }
 
-    // TODO: aquí va tu lógica REAL para generar token
-    // Por ahora regresamos uno de prueba para validar CORS:
+    // Token demo (para validar CORS y flujo)
     const token = Buffer.from(
       JSON.stringify({ email, personUid, accountUid, ts: Date.now() })
     ).toString("base64");
@@ -51,9 +50,10 @@ app.post("/generate-token", async (req, res) => {
     return res.status(200).json({ success: true, token });
   } catch (err) {
     console.error("Token generation error:", err);
-    return res
-      .status(500)
-      .json({ success: false, error: "Token generation failed" });
+    return res.status(500).json({
+      success: false,
+      error: "Token generation failed",
+    });
   }
 });
 
