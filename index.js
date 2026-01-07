@@ -1,126 +1,88 @@
-const express = require("express");
-const cors = require("cors");
-const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
 
+// ==============================
+// APP SETUP
+// ==============================
 const app = express();
-
-const TOKEN_SECRET = process.env.TOKEN_SECRET || "CAMBIA_ESTA_CLAVE_EN_RENDER";
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// ==============================
+// CORS CONFIG (CLAVE)
+// ==============================
+const allowedOrigins = [
+  "https://membersvip.esteborg.live",
+];
+
 app.use(
   cors({
-    origin: [
-      "https://esteborg-membersvip.carrd.co",
-      "https://*.carrd.co",
-    ],
+    origin: function (origin, callback) {
+      // Permite requests sin origin (Render health checks, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS: " + origin));
+    },
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false, // pon true SOLO si usas cookies
   })
 );
 
-// Salud
+// Preflight (OPTIONS) para todas las rutas
+app.options("*", cors());
+
+// ==============================
+// HEALTH CHECK (Render lo ama)
+// ==============================
 app.get("/", (req, res) => {
-  res.send("Esteborg backend OK ✔");
+  res.send("Esteborg backend running 🚀");
 });
 
-// Info de prueba
-app.get("/generate-token", (req, res) => {
-  res.json({
-    ok: true,
-    message: "Usa POST para generar tu Tokken Esteborg.",
-  });
-});
-
-// ========= GENERAR TOKKEN (POST) =========
-app.post("/generate-token", (req, res) => {
+// ==============================
+// TOKEN GENERATION ENDPOINT
+// ==============================
+app.post("/generate-token", async (req, res) => {
   try {
-    const { email, personUid, accountUid } = req.body;
+    const { user } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ error: "Falta email" });
+    if (!user) {
+      return res.status(400).json({ error: "User data missing" });
     }
 
-    const payload = {
-      email,
-      personUid: personUid || null,
-      accountUid: accountUid || null,
-      nonce: crypto.randomBytes(8).toString("hex"),
-    };
+    // 👉 AQUÍ VA TU LÓGICA REAL DE TOKEN
+    // Ejemplo simple:
+    const token = Buffer.from(
+      JSON.stringify({
+        userId: user.id || "demo",
+        email: user.email || "demo@esteborg.live",
+        issuedAt: Date.now(),
+      })
+    ).toString("base64");
 
-    // Tokken JWT válido 30 días
-    const token = jwt.sign(payload, TOKEN_SECRET, { expiresIn: "30d" });
-
-    console.log("Tokken generado para:", email);
-
-    return res.json({ token });
-  } catch (err) {
-    console.error("Error en /generate-token:", err);
-    return res.status(500).json({ error: "Error interno generando Tokken" });
-  }
-});
-
-// ========= VALIDAR TOKKEN (GET /validate?token=...) =========
-app.get("/validate", (req, res) => {
-  const token = req.query.token;
-
-  if (!token) {
-    return res
-      .status(400)
-      .json({ valid: false, error: "No se recibió tokken" });
-  }
-
-  try {
-    const decoded = jwt.verify(token, TOKEN_SECRET);
-
-    return res.json({
-      valid: true,
-      user: {
-        email: decoded.email,
-        personUid: decoded.personUid,
-        accountUid: decoded.accountUid,
-      },
+    return res.status(200).json({
+      success: true,
+      token,
     });
-  } catch (err) {
-    console.error("Error validando tokken:", err.message);
-    return res
-      .status(401)
-      .json({ valid: false, error: "Tokken inválido o expirado" });
-  }
-});
-
-// (opcional) también POST /validate-token, por si después lo usas
-app.post("/validate-token", (req, res) => {
-  const { token } = req.body;
-
-  if (!token) {
-    return res
-      .status(400)
-      .json({ valid: false, error: "No se recibió tokken" });
-  }
-
-  try {
-    const decoded = jwt.verify(token, TOKEN_SECRET);
-
-    return res.json({
-      valid: true,
-      user: {
-        email: decoded.email,
-        personUid: decoded.personUid,
-        accountUid: decoded.accountUid,
-      },
+  } catch (error) {
+    console.error("Token generation error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Token generation failed",
     });
-  } catch (err) {
-    console.error("Error validando tokken (POST):", err.message);
-    return res
-      .status(401)
-      .json({ valid: false, error: "Tokken inválido o expirado" });
   }
 });
 
-// Levantar servidor
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log("🔥 Servidor Esteborg escuchando en el puerto " + port);
+// ==============================
+// SERVER START
+// ==============================
+app.listen(PORT, () => {
+  console.log(`🔥 Esteborg backend listening on port ${PORT}`);
+});
+
 });
