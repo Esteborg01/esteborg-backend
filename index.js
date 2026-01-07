@@ -60,3 +60,49 @@ app.post("/generate-token", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🔥 Esteborg backend listening on port ${PORT}`);
 });
+app.get("/validate", (req, res) => {
+  try {
+    const token = req.query.token;
+
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({
+        valid: false,
+        error: "missing_token",
+      });
+    }
+
+    // ✅ Caso 1: Si el token que estás generando es BASE64 (demo)
+    // (el que hicimos en /generate-token con Buffer.from(...).toString("base64"))
+    let payload;
+    try {
+      payload = JSON.parse(Buffer.from(token, "base64").toString("utf8"));
+    } catch (e) {
+      // Si no es base64, puede ser JWT real -> ver caso 2
+      payload = null;
+    }
+
+    if (payload && payload.email) {
+      return res.status(200).json({
+        valid: true,
+        user: {
+          email: payload.email,
+          personUid: payload.personUid ?? null,
+          accountUid: payload.accountUid ?? null,
+        },
+      });
+    }
+
+    // ✅ Caso 2: Si el token es JWT real (empieza con eyJ...)
+    // Requiere jsonwebtoken + JWT_SECRET
+    return res.status(401).json({
+      valid: false,
+      error: "invalid_or_unsupported_token",
+    });
+  } catch (err) {
+    console.error("validate error:", err);
+    return res.status(500).json({
+      valid: false,
+      error: "server_error",
+    });
+  }
+});
